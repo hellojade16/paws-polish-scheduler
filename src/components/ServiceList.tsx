@@ -1,14 +1,44 @@
 // src/components/ServiceList.tsx
-import type { Service } from '../types/types';
+import { useEffect, useState } from 'react';
+import { supabase } from '../lib/supabase';
 
-// We added 'icon' and 'description' just for the UI display!
-const mockServices: (Service & { icon: string, description: string })[] = [
-  { id: '1', name: 'Full Grooming', durationMinutes: 120, price: 1500, icon: '✂️', description: 'Complete spa day including haircut, bath, and styling.' },
-  { id: '2', name: 'Bath & Blowdry', durationMinutes: 60, price: 800, icon: '🛁', description: 'Deep clean wash, premium shampoo, and fluff dry.' },
-  { id: '3', name: 'Nail Trimming', durationMinutes: 15, price: 200, icon: '🐾', description: 'Quick and safe nail clipping and filing.' },
-];
+interface Service {
+  id: number;
+  name: string;
+  price: number;
+  duration_minutes: number;
+}
 
-export default function ServiceList() {
+interface ServiceListProps {
+  selectedId: number | null;
+  onSelect: (id: number) => void;
+}
+
+const getServiceVisuals = (name: string) => {
+  if (name.toLowerCase().includes('grooming')) return { icon: '✂️', description: 'Complete spa day including haircut, bath, and styling.' };
+  if (name.toLowerCase().includes('bath') || name.toLowerCase().includes('blowdry')) return { icon: '🛁', description: 'Deep clean wash, premium shampoo, and fluff dry.' };
+  if (name.toLowerCase().includes('nail')) return { icon: '🐾', description: 'Quick and safe nail clipping and filing.' };
+  return { icon: '✨', description: 'Premium pet care service.' };
+};
+
+// Pass the props into the function
+export default function ServiceList({ selectedId, onSelect }: ServiceListProps) {
+  const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+
+  useEffect(() => {
+    async function fetchServices() {
+      const { data, error } = await supabase.from('services').select('*');
+      if (error) console.error('Error fetching services:', error);
+      else setServices(data || []);
+      setLoading(false);
+    }
+    fetchServices();
+  }, []);
+
+  if (loading) return <div className="py-10 text-center text-slate-500">Loading services...</div>;
+
   return (
     <section>
       <div className="flex items-center gap-3 mb-6">
@@ -17,23 +47,37 @@ export default function ServiceList() {
       </div>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {mockServices.map((service) => (
-          <div 
-            key={service.id} 
-            className="group relative bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl hover:border-teal-400 transition-all duration-300 cursor-pointer flex flex-col h-full"
-          >
-            <div className="text-4xl mb-4 group-hover:scale-110 transition-transform origin-left">{service.icon}</div>
-            <h4 className="text-xl font-bold text-slate-900 mb-2">{service.name}</h4>
-            <p className="text-slate-500 text-sm mb-6 flex-grow">{service.description}</p>
-            
-            <div className="flex items-center justify-between pt-4 border-t border-slate-100 mt-auto">
-              <span className="text-teal-700 bg-teal-50 px-3 py-1 rounded-full text-xs font-semibold tracking-wide uppercase">
-                {service.durationMinutes} mins
-              </span>
-              <span className="text-lg font-black text-slate-800">₱{service.price}</span>
+        {services.map((service) => {
+          const visuals = getServiceVisuals(service.name);
+          const isSelected = selectedId === service.id;
+
+          return (
+            <div 
+              key={service.id} 
+              onClick={() => onSelect(service.id)} 
+              className={`group relative p-6 rounded-3xl border transition-all duration-300 cursor-pointer flex flex-col h-full text-left ${
+                isSelected 
+                  ? 'border-teal-400 bg-teal-50/30 shadow-lg ring-4 ring-teal-500/20' 
+                  : 'bg-white border-slate-200 shadow-sm hover:shadow-lg hover:border-teal-400 hover:bg-teal-50/30'
+              }`}
+            >
+              <div className={`text-4xl mb-4 transition-transform origin-left ${isSelected ? 'scale-110' : 'group-hover:scale-110'}`}>
+                {visuals.icon}
+              </div>
+              <h4 className="text-xl font-bold text-slate-900 mb-2">{service.name}</h4>
+              <p className="text-slate-500 text-sm mb-6 flex-grow">{visuals.description}</p>
+              
+              <div className="flex items-center justify-between pt-4 border-t border-slate-100 mt-auto">
+                <span className={`px-3 py-1 rounded-full text-xs font-semibold tracking-wide uppercase ${
+                  isSelected ? 'bg-teal-600 text-white' : 'bg-teal-50 text-teal-700 group-hover:bg-teal-100'
+                }`}>
+                  {service.duration_minutes} mins
+                </span>
+                <span className="text-lg font-black text-slate-800">₱{service.price}</span>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
