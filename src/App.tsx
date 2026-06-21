@@ -4,6 +4,8 @@ import ServiceList from './components/ServiceList';
 import StaffList from './components/StaffList';
 import BookingForm from './components/BookingForm';
 
+import AdminDashboard from './components/AdminDashboard';
+
 export default function App() {
   // state to hold our selected choices for the database
   const [selectedServiceId, setSelectedServiceId] = useState<number | null>(null);
@@ -58,6 +60,7 @@ export default function App() {
           selectedServiceId={selectedServiceId}
           selectedStaffId={selectedStaffId}
         />
+        <AdminDashboard />  
 
       </main>
     </div>
