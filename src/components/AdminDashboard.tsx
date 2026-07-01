@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
+
 interface Booking {
   id: number;
   customer_name: string;
@@ -10,11 +11,14 @@ interface Booking {
   appointment_time: string;
   duration_minutes: number;
   status?: string;
+  booking_type?: string;
+  staff_id?: number | string;
 }
 
 export default function AdminDashboard() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterStaffId, setFilterStaffId] = useState('all');
   const [customerName, setCustomerName] = useState('');
   const [petName, setPetName] = useState('');
   const [serviceId, setServiceId] = useState(''); 
@@ -59,14 +63,14 @@ const addWalkIn = async (e: React.FormEvent) => {
   const { error } = await supabase.from('bookings').insert([
     { 
       customer_name: customerName,
-      customer_email: 'N/A',
+      customer_email: 'N/A', // Placeholder as per your existing code
       pet_name: petName,
-      service_id: parseInt(serviceId),
-      staff_id: parseInt(staffId),
+      service_id: parseInt(serviceId), // Important: Convert string to number
+      staff_id: parseInt(staffId),     // Important: Convert string to number
       appointment_date: walkInDate,
       appointment_time: walkInTime,
-      duration_minutes: serviceId === '1' ? 120 : 60, 
-      status: 'Completed'
+      status: 'Confirmed',             // Changed from 'Completed' to 'Confirmed'
+      booking_type: 'Walk-in'          // New field for your database
     }
   ]);
 
@@ -74,10 +78,14 @@ const addWalkIn = async (e: React.FormEvent) => {
     alert("Error: " + error.message);
   } else {
     alert("Walk-in added successfully!");
+    // Reset fields
     setCustomerName('');
     setPetName('');
+    // Close modal (assuming you have this state)
+    setIsModalOpen(false); 
   }
 };
+
 useEffect(() => {
   // 1. Set up the Realtime Subscription
   const channel = supabase
@@ -148,66 +156,89 @@ useEffect(() => {
 }, []);
 if (loading) return <div>Loading schedule...</div>;
 
+// Filter logic: This calculates the view based on the dropdown
+  const filteredBookings = filterStaffId === 'all' 
+    ? bookings 
+    : bookings.filter((b) => Number(b.staff_id) === Number(filterStaffId));
+
  return (
-  <div className="p-8">
-  {/* Header Section */}
-  <div className="flex justify-between items-center mb-6">
-    <h2 className="text-2xl font-bold">Upcoming Appointments</h2>
-    <button 
-      onClick={() => setIsModalOpen(true)}
-      className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-6 rounded-xl transition-all"
-    >
-      + Add Walk-in
-    </button>
-  </div>
+    <div className="p-8">
+      {/* Header & Filter Section */}
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-2xl font-bold">Upcoming Appointments</h2>
+        <div className="flex gap-4">
+          <select 
+            value={filterStaffId} 
+            onChange={(e) => setFilterStaffId(e.target.value)}
+            className="p-2 border border-slate-200 rounded-xl"
+          >
+            <option value="all">All Groomers</option>
+            {staffList.map((staff) => (
+              <option key={staff.id} value={staff.id}>{staff.name}</option>
+            ))}
+          </select>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-6 rounded-xl transition-all"
+          >
+            + Add Walk-in
+          </button>
+        </div>
+      </div>
 
-  {/* Conditional Table or Empty State */}
-  {bookings.length > 0 ? (
-    <table className="w-full bg-white rounded-lg shadow-sm border border-slate-200">
-      <thead className="bg-slate-50">
-        <tr>
-          <th className="p-4 text-left">Date</th>
-          <th className="p-4 text-left">Time</th>
-          <th className="p-4 text-left">Customer</th>
-          <th className="p-4 text-left">Email</th>
-          <th className="p-4 text-left">Pet</th>
-          <th className="p-4 text-left">Status</th>
-          <th className="p-4 text-left">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {bookings.map((b) => (
-          <tr key={b.id} className="border-t border-slate-100">
-            <td className="p-4">{b.appointment_date}</td>
-            <td className="p-4">{b.appointment_time}</td>
-            <td className="p-4">{b.customer_name}</td>
-            <td className="p-4 text-slate-500">{b.customer_email}</td>
-            <td className="p-4">{b.pet_name}</td>
-            <td className="p-4 font-bold text-slate-600">{b.status || 'Confirmed'}</td>
-            <td className="p-4 space-x-2">
-              {b.status === 'Confirmed' ? (
-                <>
-                  <button onClick={() => updateStatus(b.id, 'Completed')} className="text-green-600 hover:text-green-800 font-bold text-sm">Done</button>
-                  <button onClick={() => updateStatus(b.id, 'No-Show')} className="text-amber-600 hover:text-amber-800 font-bold text-sm">No-Show</button>
-                  <button onClick={() => deleteBooking(b.id)} className="text-red-600 hover:text-red-800 font-bold text-sm">Cancel</button>
-                </>
-              ) : (
-                <span className="text-slate-400 text-sm italic">Archived</span>
-              )}
-            </td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  ) : (
-    <div className="w-full p-12 text-center bg-white rounded-lg border border-slate-200 shadow-sm text-slate-500">
-      <div className="text-4xl mb-4">🗓️</div>
-      <h3 className="text-xl font-bold text-slate-800 mb-2">No upcoming appointments</h3>
-      <p>Everything is clear for now. Enjoy your day!</p>
-    </div>
-  )}
-
-  {/* Modal Section (The Walk-in Form) */}
+      {filteredBookings.length > 0 ? (
+        <table className="w-full bg-white rounded-lg shadow-sm border border-slate-200">
+          <thead className="bg-slate-50">
+            <tr>
+              <th className="p-4 text-left">Date</th>
+              <th className="p-4 text-left">Time</th>
+              <th className="p-4 text-left">Customer</th>
+              <th className="p-4 text-left">Pet</th>
+              <th className="p-4 text-left">Groomer</th>
+              <th className="p-4 text-left">Type</th>
+              <th className="p-4 text-left">Status</th>
+              <th className="p-4 text-left">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredBookings.map((b) => (
+              <tr key={b.id} className="border-t border-slate-100">
+                <td className="p-4">{b.appointment_date}</td>
+                <td className="p-4">{b.appointment_time}</td>
+                <td className="p-4">{b.customer_name}</td>
+                <td className="p-4">{b.pet_name}</td>
+                <td className="p-4">
+                  {staffList.find(s => s.id === Number(b.staff_id))?.name || 'Unassigned'}
+                </td>
+                <td className="p-4">
+                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                    b.booking_type === 'Walk-in' ? 'bg-purple-100 text-purple-700' : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    {b.booking_type || 'Scheduled'}
+                  </span>
+                </td>
+                <td className="p-4 font-bold text-slate-600">{b.status || 'Confirmed'}</td>
+                <td className="p-4 space-x-2">
+                  {b.status === 'Confirmed' ? (
+                    <>
+                      <button onClick={() => updateStatus(b.id, 'Completed')} className="text-green-600 hover:text-green-800 font-bold text-sm">Done</button>
+                      <button onClick={() => updateStatus(b.id, 'No-Show')} className="text-amber-600 hover:text-amber-800 font-bold text-sm">No-Show</button>
+                      <button onClick={() => deleteBooking(b.id)} className="text-red-600 hover:text-red-800 font-bold text-sm">Cancel</button>
+                    </>
+                  ) : (
+                    <span className="text-slate-400 text-sm italic">Archived</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : (
+        <div className="w-full p-12 text-center bg-white rounded-lg border border-slate-200 shadow-sm text-slate-500">
+          <h3 className="text-xl font-bold text-slate-800">No appointments found</h3>
+        </div>
+      )}
+ {/* Modal Section (The Walk-in Form) */}
   {isModalOpen && (
     <div className="fixed inset-0 bg-slate-900/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl p-8 max-w-lg w-full relative shadow-2xl">
