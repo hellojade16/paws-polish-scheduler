@@ -1,4 +1,3 @@
-// src/components/StaffList.tsx
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
@@ -6,6 +5,7 @@ interface Staff {
   id: number;
   name: string;
   is_active: boolean;
+  role: string; // Now coming from the database
 }
 
 interface StaffListProps {
@@ -13,22 +13,18 @@ interface StaffListProps {
   onSelect: (id: number) => void;
 }
 
-const getStaffVisuals = (name: string) => {
-  let role = 'Pet Care Specialist';
-  if (name.toLowerCase() === 'sarah') role = 'Head Groomer';
-  if (name.toLowerCase() === 'mike') role = 'Stylist';
-  if (name.toLowerCase() === 'jane') role = 'Bather';
-  return { role, avatarUrl: `https://api.dicebear.com/7.x/notionists/svg?seed=${name}&backgroundColor=ccfbf1` };
+// Simplified to only handle avatar generation
+const getAvatarUrl = (name: string) => {
+  return `https://api.dicebear.com/7.x/notionists/svg?seed=${name}&backgroundColor=ccfbf1`;
 };
 
-// Pass the props into the function
 export default function StaffList({ selectedId, onSelect }: StaffListProps) {
   const [staffMembers, setStaffMembers] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
-  
 
   useEffect(() => {
     async function fetchStaff() {
+      // Select '*' will now automatically include your new 'role' column
       const { data, error } = await supabase.from('staff').select('*');
       if (error) console.error('Error fetching staff:', error);
       else setStaffMembers(data || []);
@@ -50,7 +46,7 @@ export default function StaffList({ selectedId, onSelect }: StaffListProps) {
         {staffMembers
           .filter((staff) => staff.is_active)
           .map((staff) => {
-            const visuals = getStaffVisuals(staff.name);
+            const avatarUrl = getAvatarUrl(staff.name);
             const isSelected = selectedId === staff.id;
 
             return (
@@ -66,10 +62,11 @@ export default function StaffList({ selectedId, onSelect }: StaffListProps) {
                 <div className={`w-20 h-20 mx-auto mb-3 rounded-full overflow-hidden bg-slate-100 border-4 shadow-sm transition-colors ${
                   isSelected ? 'border-teal-300' : 'border-white group-hover:border-teal-100'
                 }`}>
-                  <img src={visuals.avatarUrl} alt={staff.name} className="w-full h-full object-cover" />
+                  <img src={avatarUrl} alt={staff.name} className="w-full h-full object-cover" />
                 </div>
                 <h4 className="text-lg font-bold text-slate-900">{staff.name}</h4>
-                <p className="text-xs text-teal-600 font-bold uppercase tracking-wider mt-1">{visuals.role}</p>
+                {/* Now displaying dynamic staff.role */}
+                <p className="text-xs text-teal-600 font-bold uppercase tracking-wider mt-1">{staff.role}</p>
               </button>
             );
           })}

@@ -163,7 +163,7 @@ export default function BookingForm({ selectedServiceId, selectedStaffId }: Book
     <div className="bg-teal-50 border border-teal-200 text-teal-800 p-12 rounded-3xl text-center shadow-sm max-w-3xl mx-auto mt-4">
       <div className="text-6xl mb-4">🎉</div>
       <h3 className="text-3xl font-bold mb-2">Booking Confirmed!</h3>
-      <p className="text-teal-700 mb-8">Your appointment for {petName} has been securely saved.</p>
+      <p className="text-teal-700 mb-8">Your appointment for {petName} has been securely saved. Please check your email for confirmation.</p>
       <button onClick={() => window.location.reload()} className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg transition-all">
         Book Another Appointment
       </button>
