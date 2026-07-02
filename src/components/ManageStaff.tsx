@@ -11,6 +11,7 @@ interface Staff {
 export default function ManageStaff() {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isActive, setIsActive] = useState(true);
   
   // State for the Form/Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -19,8 +20,26 @@ export default function ManageStaff() {
   const [role, setRole] = useState('');
 
   useEffect(() => {
-    fetchStaff();
-  }, []);
+  // 1. Initial Fetch
+  fetchStaff();
+
+  // 2. Add Realtime Subscription
+  const channel = supabase
+    .channel('staff-changes')
+    .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'staff' 
+    }, () => {
+      // Whenever ANY change happens to the 'staff' table, re-fetch
+      fetchStaff(); 
+    })
+    .subscribe();
+    // 3. Cleanup on unmount
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, []);
 
   async function fetchStaff() {
     setLoading(true);
@@ -31,35 +50,34 @@ export default function ManageStaff() {
 
   // Open Modal for Add/Edit
   const openModal = (s?: Staff) => {
-    if (s) {
-      setEditingStaff(s);
-      setName(s.name);
-      setRole(s.role);
-    } else {
-      setEditingStaff(null);
-      setName('');
-      setRole('');
-    }
-    setIsModalOpen(true);
-  };
+  if (s) {
+    setEditingStaff(s);
+    setName(s.name);
+    setRole(s.role);
+    setIsActive(s.is_active); 
+  } else {
+    setEditingStaff(null);
+    setName('');
+    setRole('');
+    setIsActive(true); 
+  }
+  setIsModalOpen(true);
+};
 
-  // Save (Insert or Update)
-  async function saveStaff() {
+const saveStaff = async () => {
     if (editingStaff) {
-      // Edit Mode
-      await supabase.from('staff').update({ name, role }).eq('id', editingStaff.id);
+      await supabase.from('staff').update({ name, role, is_active: isActive }).eq('id', editingStaff.id);
     } else {
-      // Add Mode
-      await supabase.from('staff').insert({ name, role, is_active: true });
+      await supabase.from('staff').insert({ name, role, is_active: isActive });
     }
     setIsModalOpen(false);
     fetchStaff();
-  }
+  };
 
-  async function toggleStatus(id: number, currentStatus: boolean) {
+  const toggleStatus = async (id: number, currentStatus: boolean) => {
     await supabase.from('staff').update({ is_active: !currentStatus }).eq('id', id);
     fetchStaff();
-  }
+  };
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
@@ -75,18 +93,33 @@ export default function ManageStaff() {
 
       {/* Modal / Form */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-8 rounded-3xl w-full max-w-md shadow-2xl">
-            <h3 className="text-xl font-bold mb-4">{editingStaff ? 'Edit Staff' : 'Add New Staff'}</h3>
-            <input className="w-full p-3 mb-4 border rounded-xl" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
-            <input className="w-full p-3 mb-6 border rounded-xl" placeholder="Role (e.g. Groomer)" value={role} onChange={(e) => setRole(e.target.value)} />
-            <div className="flex gap-4">
-              <button onClick={() => setIsModalOpen(false)} className="flex-1 p-3 bg-slate-100 rounded-xl font-bold">Cancel</button>
-              <button onClick={saveStaff} className="flex-1 p-3 bg-teal-600 text-white rounded-xl font-bold">Save</button>
-            </div>
-          </div>
-        </div>
-      )}
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <div className="bg-white p-8 rounded-3xl w-full max-w-md shadow-2xl">
+      <h3 className="text-xl font-bold mb-4">{editingStaff ? 'Edit Staff' : 'Add New Staff'}</h3>
+      
+      <input className="w-full p-3 mb-4 border rounded-xl" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
+      <input className="w-full p-3 mb-4 border rounded-xl" placeholder="Role (e.g. Groomer)" value={role} onChange={(e) => setRole(e.target.value)} />
+      
+      {/* NEW: The Status Toggle Switch */}
+      <label className="flex items-center gap-3 mb-6 p-4 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+        <input 
+          type="checkbox" 
+          checked={isActive} 
+          onChange={(e) => setIsActive(e.target.checked)} 
+          className="w-5 h-5 accent-teal-600"
+        />
+        <span className="font-bold text-slate-700">
+          Status: {isActive ? 'Active (Visible in Booking)' : 'Inactive (Hidden)'}
+        </span>
+      </label>
+
+      <div className="flex gap-4">
+        <button onClick={() => setIsModalOpen(false)} className="flex-1 p-3 bg-slate-100 rounded-xl font-bold">Cancel</button>
+        <button onClick={saveStaff} className="flex-1 p-3 bg-teal-600 text-white rounded-xl font-bold">Save</button>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Table */}
       {loading ? (

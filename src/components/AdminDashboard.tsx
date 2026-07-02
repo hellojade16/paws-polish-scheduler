@@ -22,12 +22,22 @@ export default function AdminDashboard() {
   const [search, setSearch] = useState('');
   const [filterGroomer, setFilterGroomer] = useState('all');
 
+  // Time Formatter
+  const formatTime = (timeStr: string) => {
+    const [h, m] = timeStr.split(':');
+    const hour = parseInt(h);
+    const suffix = hour >= 12 ? 'PM' : 'AM';
+    const formattedHour = hour % 12 || 12;
+    return `${formattedHour}:${m} ${suffix}`;
+  };
+
   // Derived state for Today
   const today = new Date().toISOString().split('T')[0];
   const todayBookings = bookings.filter(b => b.appointment_date === today && b.status !== 'Cancelled');
   
   // Apply Filters
   const filteredBookings = todayBookings.filter((b) => {
+    if (b.status === 'Completed') return false; // Hides completed from table
     const matchesSearch = b.customer_name.toLowerCase().includes(search.toLowerCase()) || 
                           b.pet_name.toLowerCase().includes(search.toLowerCase());
     const matchesGroomer = filterGroomer === 'all' || String(b.staff_id) === filterGroomer;
@@ -59,18 +69,36 @@ export default function AdminDashboard() {
   }
 };
 
-  useEffect(() => {
-    async function fetchData() {
-      const [ { data: s }, { data: b } ] = await Promise.all([
-        supabase.from('staff').select('id, name').eq('is_active', true),
-        supabase.from('bookings').select('*').gte('appointment_date', today)
-      ]);
-      if (s) setStaffList(s); 
-      if (b) setBookings(b);
-      setLoading(false);
-    }
-    fetchData();
-  }, [today]);
+ useEffect(() => {
+  // 1. Initial Fetch
+  async function fetchData() {
+    const [ { data: s }, { data: b } ] = await Promise.all([
+      supabase.from('staff').select('id, name').eq('is_active', true),
+      supabase.from('bookings').select('*').gte('appointment_date', today)
+    ]);
+    if (s) setStaffList(s); 
+    if (b) setBookings(b);
+    setLoading(false);
+  }
+  fetchData();
+
+  // 2. Add Realtime Subscription
+  const channel = supabase
+    .channel('dashboard-changes')
+    .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'bookings' 
+    }, () => {
+      fetchData(); 
+    })
+    .subscribe();
+
+  // 3. Cleanup on unmount
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [today]);
 
   if (loading) return (
     <div className="p-8 max-w-7xl mx-auto animate-pulse">
@@ -160,7 +188,8 @@ export default function AdminDashboard() {
             <tbody>
               {filteredBookings.map((b) => (
                 <tr key={b.id} className="border-t border-slate-100 hover:bg-slate-50">
-                  <td className="p-4 text-sm text-slate-600">{b.appointment_time}</td>
+                  {/* Updated display to use formatTime */}
+                  <td className="p-4 text-sm text-slate-600">{formatTime(b.appointment_time)}</td>
                   <td className="p-4 text-sm font-bold text-slate-800">{b.customer_name}</td>
                   <td className="p-4 text-sm text-slate-600">{b.customer_email}</td>
                   <td className="p-4 text-sm text-slate-600">{b.pet_name}</td>

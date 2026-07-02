@@ -37,9 +37,8 @@ export default function ViewBookings() {
     return matchesSearch && matchesGroomer && matchesDate && matchesStatus && matchesType;
   });
 
-  useEffect(() => {
+useEffect(() => {
     async function fetchData() {
-      // Fetch EVERYTHING (removed the .gte filter to show history)
       const [ { data: s }, { data: b } ] = await Promise.all([
         supabase.from('staff').select('id, name'),
         supabase.from('bookings').select('*').order('appointment_date', { ascending: false })
@@ -48,7 +47,26 @@ export default function ViewBookings() {
       if (b) setBookings(b);
       setLoading(false);
     }
+
+    // 1. Initial Fetch
     fetchData();
+
+    // 2. Add Realtime Subscription
+    const channel = supabase
+      .channel('bookings-view-changes')
+      .on('postgres_changes', { 
+          event: '*', 
+          schema: 'public', 
+          table: 'bookings' 
+      }, () => {
+        fetchData(); 
+      })
+      .subscribe();
+
+    // 3. Cleanup on unmount
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, []);
 
  return (
