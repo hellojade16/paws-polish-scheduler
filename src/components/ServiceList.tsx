@@ -1,6 +1,4 @@
 // src/components/ServiceList.tsx
-import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
 
 interface Service {
   id: number;
@@ -10,6 +8,7 @@ interface Service {
 }
 
 interface ServiceListProps {
+  services: Service[]; // Now receiving this list from the parent
   selectedId: number | null;
   onSelect: (id: number) => void;
 }
@@ -21,23 +20,9 @@ const getServiceVisuals = (name: string) => {
   return { icon: '✨', description: 'Premium pet care service.' };
 };
 
-// Pass the props into the function
-export default function ServiceList({ selectedId, onSelect }: ServiceListProps) {
-  const [services, setServices] = useState<Service[]>([]);
-  const [loading, setLoading] = useState(true);
-  
-
-  useEffect(() => {
-    async function fetchServices() {
-      const { data, error } = await supabase.from('services').select('*');
-      if (error) console.error('Error fetching services:', error);
-      else setServices(data || []);
-      setLoading(false);
-    }
-    fetchServices();
-  }, []);
-
-  if (loading) return <div className="py-10 text-center text-slate-500">Loading services...</div>;
+export default function ServiceList({ services, selectedId, onSelect }: ServiceListProps) {
+  // No useEffect or supabase fetching here anymore! 
+  // We just render the services passed in from the parent.
 
   return (
     <section>

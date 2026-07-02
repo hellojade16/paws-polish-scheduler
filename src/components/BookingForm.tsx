@@ -236,9 +236,23 @@ export default function BookingForm({ selectedServiceId, selectedStaffId }: Book
         </div>
 
         <div className="pt-6 mt-6 border-t border-slate-100">
-          <button type="submit" disabled={isSubmitting || !appointmentTime} className={`w-full font-bold py-4 rounded-xl shadow-lg transition-all ${isSubmitting || !appointmentTime ? 'bg-slate-300 text-slate-500' : 'bg-teal-600 hover:bg-teal-700 text-white'}`}>
-            <span>{isSubmitting ? 'Saving...' : 'Confirm Appointment'}</span> <span>🐾</span>
-          </button>
+          <button 
+  type="submit" 
+  disabled={isSubmitting || !appointmentTime} 
+  className={`w-full font-bold py-4 rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 ${isSubmitting || !appointmentTime ? 'bg-slate-300 text-slate-500' : 'bg-teal-600 hover:bg-teal-700 text-white'}`}
+>
+  {isSubmitting ? (
+    <>
+      {/* The Spinner */}
+      <div className="w-5 h-5 border-2 border-slate-500 border-t-transparent rounded-full animate-spin"></div>
+      <span>Saving...</span>
+    </>
+  ) : (
+    <>
+      <span>Confirm Appointment</span> <span>🐾</span>
+    </>
+  )}
+</button>
         </div>
       </form>
     </section>

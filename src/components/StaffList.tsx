@@ -1,40 +1,23 @@
-import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+// src/components/StaffList.tsx
 
 interface Staff {
   id: number;
   name: string;
   is_active: boolean;
-  role: string; // Now coming from the database
+  role: string;
 }
 
 interface StaffListProps {
+  staff: Staff[]; // Now receiving the data as a prop
   selectedId: number | null;
   onSelect: (id: number) => void;
 }
 
-// Simplified to only handle avatar generation
 const getAvatarUrl = (name: string) => {
   return `https://api.dicebear.com/7.x/notionists/svg?seed=${name}&backgroundColor=ccfbf1`;
 };
 
-export default function StaffList({ selectedId, onSelect }: StaffListProps) {
-  const [staffMembers, setStaffMembers] = useState<Staff[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchStaff() {
-      // Select '*' will now automatically include your new 'role' column
-      const { data, error } = await supabase.from('staff').select('*');
-      if (error) console.error('Error fetching staff:', error);
-      else setStaffMembers(data || []);
-      setLoading(false);
-    }
-    fetchStaff();
-  }, []);
-
-  if (loading) return <div className="py-10 text-center text-slate-500">Loading groomers...</div>;
-
+export default function StaffList({ staff, selectedId, onSelect }: StaffListProps) {
   return (
     <section>
       <div className="flex items-center gap-3 mb-6">
@@ -43,16 +26,16 @@ export default function StaffList({ selectedId, onSelect }: StaffListProps) {
       </div>
       
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {staffMembers
-          .filter((staff) => staff.is_active)
-          .map((staff) => {
-            const avatarUrl = getAvatarUrl(staff.name);
-            const isSelected = selectedId === staff.id;
+        {staff
+          .filter((s) => s.is_active) // Filter based on the prop received
+          .map((s) => {
+            const avatarUrl = getAvatarUrl(s.name);
+            const isSelected = selectedId === s.id;
 
             return (
               <button 
-                key={staff.id} 
-                onClick={() => onSelect(staff.id)} 
+                key={s.id} 
+                onClick={() => onSelect(s.id)} 
                 className={`p-5 rounded-3xl border transition-all text-center group ${
                   isSelected
                     ? 'border-teal-400 bg-teal-50/30 shadow-lg ring-4 ring-teal-500/20'
@@ -62,11 +45,10 @@ export default function StaffList({ selectedId, onSelect }: StaffListProps) {
                 <div className={`w-20 h-20 mx-auto mb-3 rounded-full overflow-hidden bg-slate-100 border-4 shadow-sm transition-colors ${
                   isSelected ? 'border-teal-300' : 'border-white group-hover:border-teal-100'
                 }`}>
-                  <img src={avatarUrl} alt={staff.name} className="w-full h-full object-cover" />
+                  <img src={avatarUrl} alt={s.name} className="w-full h-full object-cover" />
                 </div>
-                <h4 className="text-lg font-bold text-slate-900">{staff.name}</h4>
-                {/* Now displaying dynamic staff.role */}
-                <p className="text-xs text-teal-600 font-bold uppercase tracking-wider mt-1">{staff.role}</p>
+                <h4 className="text-lg font-bold text-slate-900">{s.name}</h4>
+                <p className="text-xs text-teal-600 font-bold uppercase tracking-wider mt-1">{s.role}</p>
               </button>
             );
           })}

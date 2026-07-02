@@ -28,8 +28,18 @@ export default function LoginPage() {
         <h2 className="text-2xl font-bold text-slate-800">Admin Login</h2>
         <input type="email" placeholder="Email" onChange={(e) => setEmail(e.target.value)} className="w-full p-3 border border-slate-200 rounded-xl" required />
         <input type="password" placeholder="Password" onChange={(e) => setPassword(e.target.value)} className="w-full p-3 border border-slate-200 rounded-xl" required />
-        <button disabled={loading} className="w-full bg-teal-600 text-white font-bold py-3 rounded-xl hover:bg-teal-700 transition-all">
-          {loading ? 'Logging in...' : 'Login'}
+        <button
+          type="submit"
+          disabled={loading} // Prevents double-clicking
+          className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-4 rounded-xl transition-all flex items-center justify-center"
+        >
+          {loading ? (
+            /* The Spinner */
+            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+          ) : (
+            /* The Text */
+            "Login"
+          )}
         </button>
       </form>
     </div>
