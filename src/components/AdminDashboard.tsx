@@ -9,7 +9,9 @@ interface Booking {
   appointment_date: string;
   appointment_time: string;
   status?: string;
+  booking_type?: string; // Added this
   staff_id?: number | string;
+  services?: { name: string };
 }
 
 export default function AdminDashboard() {
@@ -74,7 +76,7 @@ export default function AdminDashboard() {
   async function fetchData() {
     const [ { data: s }, { data: b } ] = await Promise.all([
       supabase.from('staff').select('id, name').eq('is_active', true),
-      supabase.from('bookings').select('*').gte('appointment_date', today)
+      supabase.from('bookings').select('*, services(name)').gte('appointment_date', today)
     ]);
     if (s) setStaffList(s); 
     if (b) setBookings(b);
@@ -172,52 +174,55 @@ export default function AdminDashboard() {
 
       {/* Table or Empty State */}
       {filteredBookings.length > 0 ? (
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="p-4 text-left text-xs font-bold text-slate-500 uppercase">Time</th>
-                <th className="p-4 text-left text-xs font-bold text-slate-500 uppercase">Customer</th>
-                <th className="p-4 text-left text-xs font-bold text-slate-500 uppercase">Email</th>
-                <th className="p-4 text-left text-xs font-bold text-slate-500 uppercase">Pet</th>
-                <th className="p-4 text-left text-xs font-bold text-slate-500 uppercase">Groomer</th>
-                <th className="p-4 text-left text-xs font-bold text-slate-500 uppercase">Status</th>
-                <th className="p-4 text-left text-xs font-bold text-slate-500 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredBookings.map((b) => (
-                <tr key={b.id} className="border-t border-slate-100 hover:bg-slate-50">
-                  {/* Updated display to use formatTime */}
-                  <td className="p-4 text-sm text-slate-600">{formatTime(b.appointment_time)}</td>
-                  <td className="p-4 text-sm font-bold text-slate-800">{b.customer_name}</td>
-                  <td className="p-4 text-sm text-slate-600">{b.customer_email}</td>
-                  <td className="p-4 text-sm text-slate-600">{b.pet_name}</td>
-                  <td className="p-4 text-sm font-medium text-teal-700">{staffList.find(s => s.id === Number(b.staff_id))?.name || '—'}</td>
-                  <td className="p-4">
-                    <span className={`px-3 py-1 rounded-full text-[10px] font-bold ${
-                      b.status === 'Completed' ? 'bg-green-100 text-green-700' : 
-                      b.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 
-                      'bg-yellow-100 text-yellow-700'
-                    }`}>
-                      {b.status}
-                    </span>
-                  </td>
-                  <td className="p-4 flex gap-2">
-                    {b.status === 'Confirmed' ? (
-                      <>
-                        <button onClick={() => updateStatus(b.id, 'Completed')} className="text-green-600 hover:bg-green-50 px-2 py-1 rounded-md text-xs font-bold">Done</button>
-                        <button onClick={() => cancelBooking(b.id)} className="text-red-600 hover:bg-red-50 px-2 py-1 rounded-md text-xs font-bold">Cancel</button>
-                      </>
-                    ) : (
-                      <span className="text-slate-400 text-xs italic px-2">{b.status}</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="p-4 text-left text-xs font-bold text-slate-500 uppercase">Time</th>
+                    <th className="p-4 text-left text-xs font-bold text-slate-500 uppercase">Customer</th>
+                    <th className="p-4 text-left text-xs font-bold text-slate-500 uppercase">Email</th>
+                    <th className="p-4 text-left text-xs font-bold text-slate-500 uppercase">Pet</th>
+                    <th className="p-4 text-left text-xs font-bold text-slate-500 uppercase">Service</th>
+                    <th className="p-4 text-left text-xs font-bold text-slate-500 uppercase">Type</th>
+                    <th className="p-4 text-left text-xs font-bold text-slate-500 uppercase">Groomer</th>
+                    <th className="p-4 text-left text-xs font-bold text-slate-500 uppercase">Status</th>
+                    <th className="p-4 text-left text-xs font-bold text-slate-500 uppercase">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredBookings.map((b) => (
+                    <tr key={b.id} className="border-t border-slate-100 hover:bg-slate-50">
+                      <td className="p-4 text-sm text-slate-600">{formatTime(b.appointment_time)}</td>
+                      <td className="p-4 text-sm font-bold text-slate-800">{b.customer_name}</td>
+                      <td className="p-4 text-sm text-slate-600">{b.customer_email}</td>
+                      <td className="p-4 text-sm text-slate-600">{b.pet_name}</td>
+                      <td className="p-4 text-sm text-slate-600">{b.services?.name || '—'}</td> 
+                      <td className="p-4 text-sm text-slate-600">{b.booking_type || '—'}</td>
+                      <td className="p-4 text-sm font-medium text-teal-700">{staffList.find(s => s.id === Number(b.staff_id))?.name || '—'}</td>
+                      <td className="p-4">
+                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold ${
+                          b.status === 'Completed' ? 'bg-green-100 text-green-700' : 
+                          b.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 
+                          'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {b.status}
+                        </span>
+                      </td>
+                      <td className="p-4 flex gap-2">
+                        {b.status === 'Confirmed' ? (
+                          <>
+                            <button onClick={() => updateStatus(b.id, 'Completed')} className="text-green-600 hover:bg-green-50 px-2 py-1 rounded-md text-xs font-bold">Done</button>
+                            <button onClick={() => cancelBooking(b.id)} className="text-red-600 hover:bg-red-50 px-2 py-1 rounded-md text-xs font-bold">Cancel</button>
+                          </>
+                        ) : (
+                          <span className="text-slate-400 text-xs italic px-2">{b.status}</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
       ) : (
         <div className="bg-white p-16 text-center rounded-3xl border-2 border-dashed border-slate-200">
           <div className="text-6xl mb-4">🐾</div>
