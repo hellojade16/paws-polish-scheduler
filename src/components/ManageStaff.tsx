@@ -20,26 +20,24 @@ export default function ManageStaff() {
   const [role, setRole] = useState('');
 
   useEffect(() => {
-  // 1. Initial Fetch
   fetchStaff();
 
   // 2. Add Realtime Subscription
   const channel = supabase
-    .channel('staff-changes')
-    .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'staff' 
-    }, () => {
-      // Whenever ANY change happens to the 'staff' table, re-fetch
-      fetchStaff(); 
-    })
-    .subscribe();
-    // 3. Cleanup on unmount
-  return () => {
-    supabase.removeChannel(channel);
-  };
+    .channel('staff-changes')
+    .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'staff' 
+    }, () => {
+      fetchStaff(); 
+    })
+    .subscribe();
+  return () => {
+    supabase.removeChannel(channel);
+  };
 }, []);
+
 
   async function fetchStaff() {
     setLoading(true);
@@ -71,12 +69,10 @@ const saveStaff = async () => {
       await supabase.from('staff').insert({ name, role, is_active: isActive });
     }
     setIsModalOpen(false);
-    fetchStaff();
   };
 
   const toggleStatus = async (id: number, currentStatus: boolean) => {
     await supabase.from('staff').update({ is_active: !currentStatus }).eq('id', id);
-    fetchStaff();
   };
 
   return (
@@ -100,7 +96,6 @@ const saveStaff = async () => {
       <input className="w-full p-3 mb-4 border rounded-xl" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
       <input className="w-full p-3 mb-4 border rounded-xl" placeholder="Role (e.g. Groomer)" value={role} onChange={(e) => setRole(e.target.value)} />
       
-      {/* NEW: The Status Toggle Switch */}
       <label className="flex items-center gap-3 mb-6 p-4 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
         <input 
           type="checkbox" 
@@ -120,7 +115,6 @@ const saveStaff = async () => {
     </div>
   </div>
 )}
-
       {/* Table */}
       {loading ? (
         <div className="animate-pulse h-96 bg-slate-200 rounded-3xl w-full"></div>
@@ -141,10 +135,17 @@ const saveStaff = async () => {
                   <td className="p-4 font-bold text-slate-800">{s.name}</td>
                   <td className="p-4 text-slate-600">{s.role}</td>
                   <td className="p-4">
-                    <button onClick={() => toggleStatus(s.id, s.is_active)} className={`px-3 py-1 rounded-full text-[10px] font-bold ${s.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
-                      {s.is_active ? 'Active' : 'Inactive'}
-                    </button>
-                  </td>
+                  <button 
+                    onClick={() => toggleStatus(s.id, s.is_active)} 
+                    className={`px-3 py-1 rounded-full text-[10px] font-bold transition-all duration-200 cursor-pointer 
+                                hover:scale-105 active:scale-95 hover:shadow-sm
+                                ${s.is_active 
+                                  ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                                  : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                  >
+                    {s.is_active ? '● Active' : '○ Inactive'}
+                  </button>
+                </td>
                   <td className="p-4">
                     <button onClick={() => openModal(s)} className="text-teal-600 font-bold hover:underline">Edit</button>
                   </td>
