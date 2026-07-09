@@ -1,3 +1,4 @@
+// src/components/ManageStaff.tsx
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import ReactDOM from 'react-dom';
@@ -13,12 +14,23 @@ export default function ManageStaff() {
   const [staff, setStaff] = useState<Staff[]>([]);
   const [loading, setLoading] = useState(true);
   
+  // Custom Toast State Engine
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
   // Form States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStaff, setEditingStaff] = useState<Staff | null>(null);
   const [name, setName] = useState('');
   const [role, setRole] = useState('');
   const [isActive, setIsActive] = useState(true);
+
+  // Auto-dismiss handler for notifications
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   useEffect(() => {
     fetchStaff();
@@ -38,6 +50,10 @@ export default function ManageStaff() {
     setLoading(false);
   }
 
+  const showNotification = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+  };
+
   const openModal = (s?: Staff) => {
     if (s) {
       setEditingStaff(s);
@@ -54,25 +70,72 @@ export default function ManageStaff() {
   };
 
   const saveStaff = async () => {
-    if (editingStaff) {
-      await supabase.from('staff').update({ name, role, is_active: isActive }).eq('id', editingStaff.id);
-    } else {
-      await supabase.from('staff').insert({ name, role, is_active: isActive });
+    // Replaces browser pop-up with a premium inline notification bar
+    if (!name.trim() || !role.trim()) {
+      showNotification("Please fill out both the Name and Role Descripton fields.", "error");
+      return;
     }
-    setIsModalOpen(false);
+
+    const staffPayload = { 
+      name: name.trim(), 
+      role: role.trim(), 
+      is_active: isActive 
+    };
+
+    try {
+      if (editingStaff) {
+        await supabase.from('staff').update(staffPayload).eq('id', editingStaff.id);
+        showNotification(`${staffPayload.name} updated successfully!`, "success");
+      } else {
+        await supabase.from('staff').insert(staffPayload);
+        showNotification(`${staffPayload.name} added to the team roster!`, "success");
+      }
+      setIsModalOpen(false);
+    } catch (err) {
+      showNotification("Database communication pipeline failure.", "error");
+    }
   };
 
   const toggleStatus = async (id: number, currentStatus: boolean) => {
-    await supabase.from('staff').update({ is_active: !currentStatus }).eq('id', id);
+    const { error } = await supabase.from('staff').update({ is_active: !currentStatus }).eq('id', id);
+    if (!error) {
+      showNotification("Specialist work status shifted seamlessly.", "success");
+    } else {
+      showNotification("Failed to toggle system eligibility state.", "error");
+    }
   };
 
-  // Helper to extract crisp initials for UI avatars
   const getInitials = (fullName: string) => {
     return fullName ? fullName.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '??';
   };
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
+    <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300 relative">
+      
+      {/* Premium Floating Notification System */}
+      {toast && (
+        <div className="fixed top-6 right-6 z-[10000] max-w-sm w-full bg-white rounded-2xl shadow-2xl shadow-slate-200/80 border border-slate-100 p-4 flex items-start gap-3 animate-in slide-in-from-top-5 slide-in-from-right-5 fade-in duration-300">
+          <div className={`p-2 rounded-xl shrink-0 ${toast.type === 'success' ? 'bg-teal-50 text-teal-600' : 'bg-rose-50 text-rose-600'}`}>
+            {toast.type === 'success' ? (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            )}
+          </div>
+          <div className="flex-1 pt-0.5">
+            <p className="text-xs font-black text-slate-800 tracking-tight">{toast.type === 'success' ? 'System Success' : 'Attention Required'}</p>
+            <p className="text-[11px] text-slate-500 font-semibold leading-relaxed mt-0.5">{toast.message}</p>
+          </div>
+          <button onClick={() => setToast(null)} className="text-slate-400 hover:text-slate-600 transition-colors p-0.5 rounded-lg hover:bg-slate-50 cursor-pointer">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+      )}
+
       {/* Header Container */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-100">
         <div>
@@ -82,7 +145,7 @@ export default function ManageStaff() {
         
         <button 
           onClick={() => openModal()} 
-          className="flex items-center justify-center gap-2 bg-teal-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-teal-700 transition-all hover:shadow-lg hover:shadow-teal-600/20 active:scale-95 group shrink-0 cursor-pointer"
+          className="flex items-center justify-center gap-2 bg-teal-600 text-white px-6 py-3 rounded-2xl font-bold hover:bg-teal-700 transition-all hover:shadow-lg hover:shadow-teal-600/20 active:scale-95 group shrink-0 cursor-pointer text-sm"
         >
           <svg className="w-4 h-4 group-hover:rotate-90 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 4v16m8-8H4" />
@@ -125,7 +188,6 @@ export default function ManageStaff() {
               </div>
             </div>
             
-            {/* Custom Modern Toggle Switch Design */}
             <div className="flex items-center justify-between mt-6 p-4 bg-slate-50 rounded-2xl border border-slate-100">
               <div className="flex flex-col">
                 <span className="text-sm font-bold text-slate-700">System Visibility</span>
@@ -149,7 +211,7 @@ export default function ManageStaff() {
         document.body
       )}
 
-      {/* Structural Structural Content Handler */}
+      {/* Structural Table Core Handler */}
       {loading ? (
         <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-6 space-y-4">
           <div className="flex justify-between pb-4 border-b border-slate-50">
@@ -169,7 +231,6 @@ export default function ManageStaff() {
           ))}
         </div>
       ) : staff.length === 0 ? (
-        /* Empty State Layout Fallback */
         <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm p-16 text-center max-w-2xl mx-auto flex flex-col items-center">
           <div className="w-16 h-16 bg-slate-50 border border-slate-100 flex items-center justify-center rounded-2xl text-slate-400 mb-4">
             <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -186,7 +247,6 @@ export default function ManageStaff() {
           </button>
         </div>
       ) : (
-        /* Elevated Data Matrix Container */
         <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm shadow-slate-100/40 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[600px]">
@@ -201,8 +261,6 @@ export default function ManageStaff() {
               <tbody className="divide-y divide-slate-100">
                 {staff.map((s) => (
                   <tr key={s.id} className="hover:bg-slate-50/50 transition-colors group">
-                    
-                    {/* Visual Avatar Name Field */}
                     <td className="pl-8 pr-6 py-4.5">
                       <div className="flex items-center gap-3">
                         <div className={`w-10 h-10 rounded-xl font-bold text-xs flex items-center justify-center select-none shadow-inner shrink-0 ${
@@ -215,9 +273,7 @@ export default function ManageStaff() {
                         <span className="font-bold text-slate-800 tracking-tight text-sm group-hover:text-teal-950 transition-colors">{s.name}</span>
                       </div>
                     </td>
-                    
                     <td className="px-6 py-4.5 text-slate-500 font-medium text-sm">{s.role}</td>
-                    
                     <td className="px-6 py-4.5">
                       <button 
                         onClick={() => toggleStatus(s.id, s.is_active)} 
@@ -230,7 +286,6 @@ export default function ManageStaff() {
                         {s.is_active ? 'ACTIVE' : 'INACTIVE'}
                       </button>
                     </td>
-                    
                     <td className="pl-6 pr-8 py-4.5 text-right">
                       <button 
                         onClick={() => openModal(s)} 
@@ -242,7 +297,6 @@ export default function ManageStaff() {
                         Edit Profile
                       </button>
                     </td>
-
                   </tr>
                 ))}
               </tbody>

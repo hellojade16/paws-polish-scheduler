@@ -78,11 +78,26 @@ export default function ViewBookings() {
   const today = new Date().toISOString().split('T')[0];
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
 
+  // Custom Toast State Engine
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
   const [search, setSearch] = useState('');
   const [filterGroomer, setFilterGroomer] = useState('all');
   const [filterDate, setFilterDate] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterType, setFilterType] = useState('all');
+
+  // Auto-dismiss handler for notifications
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  const showNotification = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -108,9 +123,10 @@ export default function ViewBookings() {
   const updateBooking = async (id: number, field: string, value: any) => {
     const { error } = await supabase.from('bookings').update({ [field]: value }).eq('id', id);
     if (error) {
-      alert("Operational update failed: " + error.message);
+      showNotification("Operational update failed: " + error.message, "error");
     } else {
       setBookings(prev => prev.map(b => b.id === id ? { ...b, [field]: value } : b));
+      showNotification("Booking parameter modified seamlessly.", "success");
     }
   };
 
@@ -146,7 +162,31 @@ export default function ViewBookings() {
     });
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
+    <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300 relative">
+      
+      {/* Premium Floating Notification System */}
+      {toast && (
+        <div className="fixed top-6 right-6 z-[10000] max-w-sm w-full bg-white rounded-2xl shadow-2xl shadow-slate-200/80 border border-slate-100 p-4 flex items-start gap-3 animate-in slide-in-from-top-5 slide-in-from-right-5 fade-in duration-300">
+          <div className={`p-2 rounded-xl shrink-0 ${toast.type === 'success' ? 'bg-teal-50 text-teal-600' : 'bg-rose-50 text-rose-600'}`}>
+            {toast.type === 'success' ? (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            )}
+          </div>
+          <div className="flex-1 pt-0.5">
+            <p className="text-xs font-black text-slate-800 tracking-tight">{toast.type === 'success' ? 'System Success' : 'Attention Required'}</p>
+            <p className="text-[11px] text-slate-500 font-semibold leading-relaxed mt-0.5">{toast.message}</p>
+          </div>
+          <button onClick={() => setToast(null)} className="text-slate-400 hover:text-slate-600 transition-colors p-0.5 rounded-lg hover:bg-slate-50 cursor-pointer">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+      )}
       
       {/* Title Header */}
       <div className="pb-2 border-b border-slate-100">

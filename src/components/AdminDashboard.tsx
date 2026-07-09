@@ -1,3 +1,4 @@
+// src/components/AdminDashboard.tsx
 import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import ReactDOM from 'react-dom';
@@ -69,14 +70,32 @@ export default function AdminDashboard() {
   const today = new Date().toISOString().split('T')[0];
   const [loading, setLoading] = useState(true);
 
+  // Custom Toast State Engine
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
   // Walk-In Form Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [petName, setPetName] = useState('');
   const [appointmentTime, setAppointmentTime] = useState('');
-  const [selectedStaff, setSelectedStaff] = useState<string | number>('unassigned');
+  const [selectedStaff, setSelectedStaff] = useState<string | number>('');
   const [selectedService, setSelectedService] = useState<string | number>('');
+
+  // Premium Cancellation Modal Focus Tracking Target State
+  const [bookingToCancel, setBookingToCancel] = useState<Booking | null>(null);
+
+  // Auto-dismiss handler for notifications
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  const showNotification = (message: string, type: 'success' | 'error') => {
+    setToast({ message, type });
+  };
 
   const formatTime = (timeStr: string) => {
     if (!timeStr) return '—';
@@ -106,14 +125,28 @@ export default function AdminDashboard() {
   const pendingToday = todayBookings.length - completedToday;
 
   const updateStatus = async (id: number, newStatus: string) => {
-    await supabase.from('bookings').update({ status: newStatus }).eq('id', id);
-    setBookings(prev => prev.map(b => b.id === id ? { ...b, status: newStatus } : b));
+    const { error } = await supabase.from('bookings').update({ status: newStatus }).eq('id', id);
+    if (!error) {
+      setBookings(prev => prev.map(b => b.id === id ? { ...b, status: newStatus } : b));
+      showNotification(`Appointment marked as ${newStatus.toLowerCase()} successfully!`, "success");
+    } else {
+      showNotification("Failed to update process flow status.", "error");
+    }
   };
 
-  const cancelBooking = async (id: number) => {
-    if (!window.confirm("Are you sure you want to cancel this booking?")) return;
-    const { error } = await supabase.from('bookings').update({ status: 'Cancelled' }).eq('id', id);
-    if (!error) setBookings(prev => prev.map(b => b.id === id ? { ...b, status: 'Cancelled' } : b));
+  const executeBookingCancellation = async () => {
+    if (!bookingToCancel) return;
+    
+    const targetId = bookingToCancel.id;
+    const { error } = await supabase.from('bookings').update({ status: 'Cancelled' }).eq('id', targetId);
+    
+    if (!error) {
+      setBookings(prev => prev.map(b => b.id === targetId ? { ...b, status: 'Cancelled' } : b));
+      setBookingToCancel(null);
+      showNotification("Booking entry has been cancelled.", "success");
+    } else {
+      showNotification("Failed to execute cancellation procedure.", "error");
+    }
   };
 
   const openWalkInModal = () => {
@@ -124,36 +157,40 @@ export default function AdminDashboard() {
     setCustomerEmail('');
     setPetName('');
     setAppointmentTime(currentHHMM);
-    setSelectedStaff('unassigned');
+    setSelectedStaff(staffList[0]?.id || ''); // Automatically defaults configuration to the first active stylist
     setSelectedService(servicesList[0]?.id || '');
     setIsModalOpen(true);
   };
 
   const saveWalkIn = async () => {
-    if (!customerName.trim() || !petName.trim() || !selectedService) {
-      alert("Please populate the Customer Name, Pet Profile, and Service Suite selections.");
+    // Validation check: Ensures all required operations are present before processing database inserts
+    if (!customerName.trim() || !petName.trim() || !selectedService || !selectedStaff) {
+      showNotification("Please populate the Customer Name, Pet Profile, Service Suite, and Stylist selections.", "error");
       return;
     }
 
+    const cleanEmail = customerEmail.trim();
+
     const newWalkIn = {
-      customer_name: customerName,
-      customer_email: customerEmail || 'walkin@pawsnpolish.com',
-      pet_name: petName,
+      customer_name: customerName.trim(),
+      customer_email: cleanEmail || 'walkin@pawsnpolish.com',
+      pet_name: petName.trim(),
       appointment_date: today,
       appointment_time: appointmentTime,
       status: 'Confirmed',
       booking_type: 'Walk-in',
       service_id: Number(selectedService),
-      staff_id: selectedStaff === 'unassigned' ? null : Number(selectedStaff)
+      staff_id: Number(selectedStaff)
     };
 
     const { data, error } = await supabase.from('bookings').insert(newWalkIn).select('*, services(name)');
     
     if (error) {
-      alert("Failed to store walk-in: " + error.message);
+      showNotification("Failed to register check-in row: " + error.message, "error");
     } else if (data) {
       setIsModalOpen(false);
       setBookings(prev => [...prev, data[0]]);
+      showNotification(`${newWalkIn.customer_name}'s pet checked in smoothly!`, "success");
     }
   };
 
@@ -190,8 +227,32 @@ export default function AdminDashboard() {
   );
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
+    <div className="p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300 relative">
       
+      {/* Premium Floating Notification System */}
+      {toast && (
+        <div className="fixed top-6 right-6 z-[10000] max-w-sm w-full bg-white rounded-2xl shadow-2xl shadow-slate-200/80 border border-slate-100 p-4 flex items-start gap-3 animate-in slide-in-from-top-5 slide-in-from-right-5 fade-in duration-300">
+          <div className={`p-2 rounded-xl shrink-0 ${toast.type === 'success' ? 'bg-teal-50 text-teal-600' : 'bg-rose-50 text-rose-600'}`}>
+            {toast.type === 'success' ? (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+            )}
+          </div>
+          <div className="flex-1 pt-0.5">
+            <p className="text-xs font-black text-slate-800 tracking-tight">{toast.type === 'success' ? 'System Success' : 'Attention Required'}</p>
+            <p className="text-[11px] text-slate-500 font-semibold leading-relaxed mt-0.5">{toast.message}</p>
+          </div>
+          <button onClick={() => setToast(null)} className="text-slate-400 hover:text-slate-600 transition-colors p-0.5 rounded-lg hover:bg-slate-50 cursor-pointer">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+      )}
+
       {/* Header Container Area */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-100">
         <div>
@@ -264,12 +325,12 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              {/* Elevated Groomer Selection via Custom Dropdown */}
+              {/* Elevated Groomer Selection via Custom Dropdown - Unassigned Option Removed */}
               <div className="relative">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider ml-1 mb-1.5 block">Assign Stylist</label>
                 <CustomDropdown 
-                  label={selectedStaff === 'unassigned' ? 'Leave Unassigned' : staffList.find(s => s.id == selectedStaff)?.name}
-                  options={[{ id: 'unassigned', name: 'Leave Unassigned' }, ...staffList]}
+                  label={staffList.find(s => s.id == selectedStaff)?.name || 'Select Stylist'}
+                  options={staffList}
                   value={selectedStaff}
                   onChange={setSelectedStaff}
                   className="w-full"
@@ -290,6 +351,41 @@ export default function AdminDashboard() {
             <div className="flex gap-3 mt-8">
               <button onClick={() => setIsModalOpen(false)} className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl font-bold transition-colors text-sm cursor-pointer">Cancel</button>
               <button onClick={saveWalkIn} className="flex-1 py-3.5 bg-teal-600 hover:bg-teal-700 text-white rounded-2xl font-bold transition-all shadow-lg shadow-teal-600/20 text-sm cursor-pointer">Check In Pet</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* Premium Destructive Action Confirmation Modal */}
+      {bookingToCancel && ReactDOM.createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setBookingToCancel(null)}></div>
+          <div className="relative bg-white p-7 rounded-[28px] w-full max-w-sm shadow-2xl border border-slate-100/80 animate-in fade-in zoom-in-95 duration-150 text-center">
+            <div className="w-12 h-12 bg-rose-50 text-rose-600 flex items-center justify-center rounded-2xl mx-auto mb-4 border border-rose-100/60">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </div>
+            
+            <h3 className="text-xl font-black text-slate-900 tracking-tight">Cancel Appointment?</h3>
+            <p className="text-slate-400 text-xs font-semibold mt-1 px-2 leading-relaxed">
+              Are you sure you want to cancel the reservation for <span className="text-slate-700 font-bold">{bookingToCancel.customer_name}</span> ({bookingToCancel.pet_name})? This change cannot be undone.
+            </p>
+
+            <div className="flex gap-2.5 mt-6">
+              <button 
+                onClick={() => setBookingToCancel(null)} 
+                className="flex-1 py-3 bg-slate-50 hover:bg-slate-100 text-slate-500 font-bold border border-slate-200/60 rounded-xl transition-colors text-xs cursor-pointer select-none"
+              >
+                No, Keep It
+              </button>
+              <button 
+                onClick={executeBookingCancellation} 
+                className="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl transition-all shadow-md shadow-rose-600/10 text-xs cursor-pointer select-none active:scale-95"
+              >
+                Yes, Cancel
+              </button>
             </div>
           </div>
         </div>,
@@ -381,7 +477,6 @@ export default function AdminDashboard() {
             </thead>
             <tbody className="divide-y divide-slate-100">
               
-              {/* SCENARIO 1: No upcoming Pending or Confirmed bookings left for today */}
               {pendingToday === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-20 text-center">
@@ -395,7 +490,6 @@ export default function AdminDashboard() {
                   </td>
                 </tr>
               ) : filteredBookings.length === 0 ? (
-                /* SCENARIO 2: Active bookings exist, but filter parameters hide them all */
                 <tr>
                   <td colSpan={7} className="py-20 text-center">
                     <div className="w-14 h-14 bg-slate-50 border border-slate-100 flex items-center justify-center rounded-2xl text-slate-400 mx-auto mb-4">
@@ -408,16 +502,12 @@ export default function AdminDashboard() {
                   </td>
                 </tr>
               ) : (
-                /* SCENARIO 3: Render matching active table matrix rows */
                 filteredBookings.map((b) => (
                   <tr key={b.id} className="hover:bg-slate-50/50 transition-colors group">
                     <td className="pl-8 pr-4 py-4.5 text-slate-800 font-bold text-sm select-none">{formatTime(b.appointment_time)}</td>
-                    
-                    {/* Combined Customer and Pet profile column block wrapper */}
                     <td className="px-4 py-4.5 text-sm font-bold text-slate-800 tracking-tight">
                       {b.customer_name} <span className="text-slate-400 font-normal text-xs ml-0.5">({b.pet_name})</span>
                     </td>
-                    
                     <td className="px-4 py-4.5 text-sm text-slate-500 font-medium">{b.customer_email}</td>
                     <td className="px-4 py-4.5 text-sm text-slate-600 font-semibold tracking-tight">
                       {b.services?.name || 'Standard Package'}
@@ -441,7 +531,7 @@ export default function AdminDashboard() {
                           Done
                         </button>
                         <button 
-                          onClick={() => cancelBooking(b.id)} 
+                          onClick={() => setBookingToCancel(b)} 
                           className="inline-flex items-center gap-1 px-3 py-1.5 border border-slate-200 text-slate-600 hover:text-rose-700 hover:border-rose-200 hover:bg-rose-50/30 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm bg-white active:scale-95"
                         >
                           <svg className="w-3.5 h-3.5 text-rose-600 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor">
