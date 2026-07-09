@@ -18,5 +18,5 @@ export default function ProtectedRoute({ children }: { children: ReactNode }) {
   if (loading) return <div>Loading...</div>;
   if (!session) return <Navigate to="/login" />;
   
-  return <>{children}</>; // Wrap children in a fragment
+  return <>{children}</>; 
 }
