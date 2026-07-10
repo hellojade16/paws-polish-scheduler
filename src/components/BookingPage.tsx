@@ -1,3 +1,4 @@
+// src/pages/BookingPage.tsx
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
@@ -13,19 +14,51 @@ export default function BookingPage() {
   const [selectedStaffId, setSelectedStaffId] = useState<number | null>(null);
   const navigate = useNavigate();
 
+  // Core data synchronization engine
+  async function fetchAllData() {
+    const [{ data: servicesData }, { data: staffData }] = await Promise.all([
+      supabase.from('services').select('*').order('name'),
+      supabase.from('staff').select('*').order('name') // Fetches master roster to manage state filters smoothly
+    ]);
+    
+    setServices(servicesData || []);
+    setStaff(staffData || []);
+    setLoading(false);
+  }
+
   useEffect(() => {
-    async function fetchAllData() {
-      const [{ data: servicesData }, { data: staffData }] = await Promise.all([
-        supabase.from('services').select('*'),
-        supabase.from('staff').select('*').eq('is_active', true)
-      ]);
-      
-      setServices(servicesData || []);
-      setStaff(staffData || []);
-      setLoading(false);
-    }
     fetchAllData();
-  }, []);
+
+    // 1. Mount Realtime Channel Listener for Staff adjustments
+    const staffChannel = supabase
+      .channel('public-staff-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'staff' }, (payload) => {
+        fetchAllData();
+        
+       if (payload.eventType === 'UPDATE' && !payload.new?.is_active) {
+      if (selectedStaffId === payload.new?.id) {
+        setSelectedStaffId(null);
+      }
+    }
+  })
+  .subscribe();
+
+    // 2. Mount Realtime Channel Listener for Service adjustments
+    const servicesChannel = supabase
+      .channel('public-services-sync')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'services' }, () => {
+        fetchAllData();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(staffChannel);
+      supabase.removeChannel(servicesChannel);
+    };
+  }, [selectedStaffId]);
+
+  // Filters the list down dynamically in JavaScript so customers ONLY see active groomers on their screen
+  const visibleStaff = staff.filter(s => s.is_active);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] font-sans text-slate-800 pb-20">
@@ -40,7 +73,7 @@ export default function BookingPage() {
           </div>
           <button 
             onClick={() => navigate('/login')}
-            className="hidden md:block px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full text-sm font-semibold transition-colors"
+            className="hidden md:block px-5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-full text-sm font-semibold transition-colors cursor-pointer"
           >
             Admin Login
           </button>
@@ -75,7 +108,7 @@ export default function BookingPage() {
         ) : (
           /* ACTUAL CONTENT: Only shows when loading is finished */
           <>
-            <div className="text-center space-y-4 max-w-2xl mx-auto mb-12">
+            <div className="text-center space-y-4 max-w-2xl mx-auto mb-12 animate-in fade-in duration-300">
               <h2 className="text-4xl font-black text-slate-900 tracking-tight">
                 Pamper your pet. <br/><span className="text-teal-600">Stress-free booking.</span>
               </h2>
@@ -91,7 +124,7 @@ export default function BookingPage() {
             />
             
             <StaffList 
-              staff={staff}
+              staff={visibleStaff} // Streams down strictly operational active profiles
               selectedId={selectedStaffId} 
               onSelect={setSelectedStaffId} 
             />
