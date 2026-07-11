@@ -72,7 +72,7 @@ export default function ManageStaff() {
   const saveStaff = async () => {
     // Replaces browser pop-up with a premium inline notification bar
     if (!name.trim() || !role.trim()) {
-      showNotification("Please fill out both the Name and Role Descripton fields.", "error");
+      showNotification("Please fill out both the Name and Role Description fields.", "error");
       return;
     }
 
